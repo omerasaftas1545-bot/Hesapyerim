@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hesapyerim - Alım Satım Platformu</title>
+    <!-- FontAwesome İkonları -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK (Compat Sürümleri) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --gray: #64748b;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
+
+        header {
+            background: var(--card-bg);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo { font-size: 1.3rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+
+        .disclaimer-banner {
+            background-color: #fef2f2;
+            border-left: 4px solid var(--danger);
+            color: #991b1b;
+            padding: 10px 15px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px;
+            border-radius: 6px;
+        }
+
+        .container { padding: 15px; max-width: 800px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card img { width: 100%; height: 140px; object-fit: cover; }
+        .card-body { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; }
+        .card-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-price { color: var(--primary); font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; }
+        .card-seller { font-size: 0.75rem; color: var(--gray); margin-bottom: 8px; }
+
+        .card-actions { margin-top: auto; display: flex; gap: 5px; }
+
+        .btn {
+            border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+            font-weight: 600; font-size: 0.8rem; display: flex; align-items: center;
+            justify-content: center; gap: 5px; width: 100%; transition: 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-outline { border: 1px solid var(--gray); background: transparent; color: var(--text); }
+
+        .nav-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg);
+            display: flex; justify-content: space-around; padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100;
+        }
+
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--gray); font-size: 0.75rem; cursor: pointer; }
+        .nav-item i { font-size: 1.2rem; margin-bottom: 3px; }
+        .nav-item.active { color: var(--primary); }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 600; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; }
+
+        .chat-box { background: #e2e8f0; height: 320px; border-radius: 8px; padding: 10px; overflow-y: auto; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .msg { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 0.85rem; }
+        .msg.sent { background: var(--primary); color: white; align-self: flex-end; }
+        .msg.received { background: white; color: var(--text); align-self: flex-start; }
+        .msg-sender { font-size: 0.65rem; opacity: 0.8; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-wallet"></i> Hesapyerim
+        </div>
+        <div id="user-status">
+            <button class="btn btn-primary" onclick="googleLogin()">
+                <i class="fa-brands fa-google"></i> Giriş Yap
+            </button>
+        </div>
+    </header>
+
+    <!-- Sorumluluk Reddi Uyarısı -->
+    <div class="disclaimer-banner">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.2rem;"></i>
+        <div><strong>Uyarı:</strong> Eğerki satıcı ile sorun yaşarsanız sorumlusu biz değiliz!</div>
+    </div>
+
+    <div class="container">
+        
+        <!-- 1. İLANLAR SAYFASI -->
+        <div id="page-home" class="page active">
+            <h2 style="margin-bottom: 15px; font-size: 1.2rem;">Canlı İlanlar</h2>
+            <div class="grid" id="product-list">
+                <p>İlanlar yükleniyor...</p>
+            </div>
+        </div>
+
+        <!-- 2. İLAN EKLE SAYFASI -->
+        <div id="page-add" class="page">
+            <h2 style="margin-bottom: 15px;">Yeni İlan Oluştur</h2>
+            <form id="add-form" onsubmit="createProduct(event)">
+                <div class="form-group">
+                    <label>İlan Başlığı</label>
+                    <input type="text" id="p-title" class="form-control" placeholder="Örn: Valorant / PUBG Hesabı" required>
+                </div>
+                <div class="form-group">
+                    <label>Fiyat (TL)</label>
+                    <input type="number" id="p-price" class="form-control" placeholder="Örn: 500" required>
+                </div>
+                <div class="form-group">
+                    <label>Görsel Linki (Resim URL)</label>
+                    <input type="url" id="p-img" class="form-control" placeholder="https://..." required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="padding: 12px;">İlanı Yayınla</button>
+            </form>
+        </div>
+
+        <!-- 3. SEPET SAYFASI -->
+        <div id="page-cart" class="page">
+            <h2 style="margin-bottom: 15px;">Sepetim</h2>
+            <div id="cart-list"></div>
+            <div id="cart-total" style="margin-top: 15px; font-weight: bold; font-size: 1.1rem;"></div>
+        </div>
+
+        <!-- 4. CANLI MESAJLAR SAYFASI -->
+        <div id="page-chat" class="page">
+            <h2 style="margin-bottom: 15px;">Ortak Sohbet / Mesajlaşma</h2>
+            <div class="chat-box" id="chat-box"></div>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="chat-input" class="form-control" placeholder="Mesajınızı yazın...">
+                <button class="btn btn-primary" style="width: auto;" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <!-- 5. PROFİL SAYFASI -->
+        <div id="page-profile" class="page">
+            <h2>Kullanıcı Profili</h2>
+            <div id="profile-info" style="margin-top: 15px;">
+                <p>Giriş yapmadınız. Lütfen sağ üstten Google ile giriş yapın.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Alt Navigasyon Menüsü -->
+    <nav class="nav-bar">
+        <div class="nav-item active" onclick="switchPage('home', this)">
+            <i class="fa-solid fa-house"></i>
+            <span>Anasayfa</span>
+        </div>
+        <div class="nav-item" onclick="switchPage('add', this)">
+            <i class="fa-solid fa-plus-circle"></i>
+            <span>İlan Ekle</span>
+        </div>
+        <div class="nav-item" onclick="switchPage('cart', this)">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <span>Sepetim</span>
+        </div>
+        <div class="nav-item" onclick="switchPage('chat', this)">
+            <i class="fa-solid fa-comment"></i>
+            <span>Mesajlar</span>
+        </div>
+        <div class="nav-item" onclick="switchPage('profile', this)">
+            <i class="fa-solid fa-user"></i>
+            <span>Profil</span>
+        </div>
+    </nav>
+
+    <script>
+        // FIREBASE BİLGİLERİN (Ekran görüntündekiler otomatik eklendi!)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDQt2PR6tmzH9OFxsCcZEgnbPUysKGXQB8",
+            authDomain: "hesapyerim.firebaseapp.com",
+            projectId: "hesapyerim",
+            storageBucket: "hesapyerim.firebasestorage.app",
+            messagingSenderId: "559463923125",
+            appId: "1:559463923125:web:513bdc5b49ec24a4322dfc",
+            measurementId: "G-FR72Q5WRCJ"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let cart = [];
+
+        function googleLogin() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(error => alert("Giriş Hatası: " + error.message));
+        }
+
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('user-status').innerHTML = `<img src="${user.photoURL}" style="width:32px;height:32px;border-radius:50%;">`;
+                document.getElementById('profile-info').innerHTML = `
+                    <img src="${user.photoURL}" style="width:60px;height:60px;border-radius:50%;margin-bottom:10px;">
+                    <p><strong>İsim:</strong> ${user.displayName}</p>
+                    <p><strong>E-Posta:</strong> ${user.email}</p>
+                    <button class="btn btn-outline" style="margin-top:15px;" onclick="auth.signOut()">Çıkış Yap</button>
+                `;
+            } else {
+                currentUser = null;
+                document.getElementById('user-status').innerHTML = `
+                    <button class="btn btn-primary" onclick="googleLogin()">
+                        <i class="fa-brands fa-google"></i> Giriş Yap
+                    </button>
+                `;
+            }
+        });
+
+        function switchPage(pageId, element) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            if(element) element.classList.add('active');
+            if(pageId === 'cart') renderCart();
+        }
+
+        db.collection("products").onSnapshot(snapshot => {
+            const list = document.getElementById('product-list');
+            list.innerHTML = '';
+            if(snapshot.empty) {
+                list.innerHTML = '<p>Henüz ilan eklenmemiş.</p>';
+                return;
+            }
+            snapshot.forEach(doc => {
+                const p = doc.data();
+                list.innerHTML += `
+                    <div class="card">
+                        <img src="${p.img}" alt="${p.title}">
+                        <div class="card-body">
+                            <div class="card-title">${p.title}</div>
+                            <div class="card-price">${p.price} TL</div>
+                            <div class="card-seller"><i class="fa-solid fa-user"></i> ${p.sellerName || 'Anonim'}</div>
+                            <div class="card-actions">
+                                <button class="btn btn-primary" onclick="addToCart('${p.title}', ${p.price})"><i class="fa-solid fa-cart-plus"></i></button>
+                                <button class="btn btn-outline" onclick="switchPage('chat')"><i class="fa-solid fa-envelope"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        });
+
+        function createProduct(e) {
+            e.preventDefault();
+            if(!currentUser) return alert("İlan eklemek için giriş yapın!");
+
+            db.collection("products").add({
+                title: document.getElementById('p-title').value,
+                price: Number(document.getElementById('p-price').value),
+                img: document.getElementById('p-img').value,
+                sellerName: currentUser.displayName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                alert('İlanınız başarıyla yayınlandı!');
+                document.getElementById('add-form').reset();
+                switchPage('home', document.querySelectorAll('.nav-item')[0]);
+            });
+        }
+
+        db.collection("messages").orderBy("createdAt", "asc").onSnapshot(snapshot => {
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = '';
+            snapshot.forEach(doc => {
+                const m = doc.data();
+                const isMe = currentUser && currentUser.displayName === m.sender;
+                chatBox.innerHTML += `
+                    <div class="msg ${isMe ? 'sent' : 'received'}">
+                        <div class="msg-sender">${m.sender}</div>
+                        <div>${m.text}</div>
+                    </div>
+                `;
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        function sendMessage() {
+            if(!currentUser) return alert("Mesaj yazmak için giriş yapın!");
+            const input = document.getElementById('chat-input');
+            if(input.value.trim() !== '') {
+                db.collection("messages").add({
+                    sender: currentUser.displayName,
+                    text: input.value,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                input.value = '';
+            }
+        }
+
+        function addToCart(title, price) {
+            cart.push({title, price});
+            alert(`${title} sepete eklendi!`);
+        }
+
+        function renderCart() {
+            const cartContainer = document.getElementById('cart-list');
+            const totalContainer = document.getElementById('cart-total');
+            cartContainer.innerHTML = '';
+
+            if(cart.length === 0) {
+                cartContainer.innerHTML = '<p>Sepetiniz boş.</p>';
+                totalContainer.innerHTML = '';
+                return;
+            }
+
+            let total = 0;
+            cart.forEach((item, index) => {
+                total += item.price;
+                cartContainer.innerHTML += `
+                    <div style="background:white; padding:10px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong>${item.title}</strong>
+                            <div style="color:var(--primary);">${item.price} TL</div>
+                        </div>
+                        <button class="btn" style="width:auto; color:var(--danger);" onclick="cart.splice(${index},1); renderCart();"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+            });
+            totalContainer.innerHTML = `Toplam: ${total} TL`;
+        }
+    </script>
+</body>
+</html>
